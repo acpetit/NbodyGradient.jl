@@ -127,7 +127,7 @@ function calc_dtdelements!(s::State{T},tt::TransitTimingDelayed{T}) where T <: A
 end
 
 
-function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitOutput{T},dt0::T;grad::Bool=true) #Generic function
+function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitOutput{T},dt0::T;grad::Bool=true) where T <: AbstractFloat #Generic function
     tt.tt[j,tt.count[j]] = s.t[1] + dt0
     if grad
         # Compute derivative of transit time
@@ -139,7 +139,7 @@ function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitOutput{T},dt0::T
 end
 
 
-function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitParameters{T},dt0::T;grad::Bool=true)
+function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitParameters{T},dt0::T;grad::Bool=true) where T <: AbstractFloat
         # Compute the impact parameter and sky velocity, save to tt along with transit time.
         tt.ttbv[1,j,tt.count[j]] = s.t[1] + dt0
 
@@ -158,7 +158,7 @@ function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitParameters{T},dt
         return
 end
 
-function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitTimingDelayed{T},dt0::T;grad::Bool=true)
+function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitTimingDelayed{T},dt0::T;grad::Bool=true) where T <: AbstractFloat
     
     delay = s.x[3,j]/CLIGHT # NbodyGradient initializes the system in the center-of mass frame.
     tt.ttd[1,j,tt.count[j]] = s.t[1] + dt0 
