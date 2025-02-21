@@ -124,6 +124,66 @@ function TransitSnapshot(times::Vector{T},ic::ElementsIC{T}) where T<:AbstractFl
     return TransitSeries(nt,times,zeros(T,n,nt),zeros(T,n,nt),zeros(T,2,n,nt,7,n),zeros(T,2,n,nt,7,n))
 end
 
+"""
+    TransitTimingDelayed{T<:AbstractFloat} <: TransitOutput{T}
+
+Transit times and derivatives including simple light travel delay.
+
+# (User-facing) Fields
+- `tttd::Array{3,T}` : Array with the absolute transit time followed by delayed transit time
+- `dttddq0::Array{T,5}` : Derivatives  with respect to the initial Cartesian coordinates and masses.
+- `dttddelements::Array{T,5}` : Derivatives with respect to the initial orbital elements and masses.
+"""
+struct TransitTimingDelayed{T<:AbstractFloat} <: TransitOutput{T}
+    tttd::Array{3,T}
+    dttddq0::Array{T,5}
+    dttddelements::Array{T,5}
+
+    # Internal
+    count::Vector{Int64}
+    ntt::Int64
+    ti::Int64
+    occs::Vector{Int64}
+    dtdq::Array{T,3}
+    jacinitdelay::Matrix{T}
+    gsave::Vector{T}
+    s_prior::State{T}
+    s_transit::State{T}
+end
+
+"""
+    TransitTimingDelayed(tmax, ic; ti)
+
+Constructor for [`TransitTimingDelayed`](@ref) type.
+
+# Arguments
+- `tmax::T` : Expected total elapsed integration time. (Allocates arrays accordingly)
+- `ic::ElementsIC{T}` : Initial conditions for the system
+
+## Optional
+- `ti::Int64=1` : Index of the body with respect to which transits are measured. (Default is the central body)
+"""
+function TransitTimingDelayed(tmax::T,ic::ElementsIC{T},ti::Int64=1) where T<:AbstractFloat
+    n = ic.nbody
+    ind = isfinite.(tmax./ic.elements[:,2])
+    ntt = maximum(ceil.(Int64,abs.(tmax./ic.elements[ind,2])).+3)
+    tttd = zeros(T,2,n,ntt)
+    dttddq0 = zeros(T,2,n,ntt,7,n)
+    dttddelements = zeros(T,2,n,ntt,7,n)
+    count = zeros(Int64,n)
+    occs = setdiff(collect(1:n),ti)
+    dtdq = zeros(T,1,7,n)
+    gsave = zeros(T,n)
+    s_prior = State(ic)
+    s_transit = State(ic)
+
+# stuff about jac delay here
+
+    return TransitTimingDelayed(tttd,dttddq0,dttddelements,count,ntt,ti,occs,dtdq,gsave,s_prior,s_transit)
+end
+
+
+
 function zero_out!(tt::TransitOutput{T}) where T
     for i in 1:length(fieldnames(typeof(tt)))
         if typeof(getfield(tt,i)) <: Array{T}

@@ -79,33 +79,7 @@ function findtransit!(i::Int64,j::Int64,dt0::T,s::State{T},d::Derivatives{T},tt:
         intr.scheme(s,d,dt0)
     end
 
-    if tt isa TransitParameters
-        # Compute the impact parameter and sky velocity, save to tt along with transit time.
-        tt.ttbv[1,j,tt.count[j]] = s.t[1] + dt0
-
-        if grad
-            # Compute derivative of transit time, impact parameter, and sky velocity.
-            vsky,bsky2 = dtbvdq!(i,j,s.x,s.v,s.jac_step,s.dqdt,tt.dtbvdq)
-            tt.ttbv[2,j,tt.count[j]] = vsky
-            tt.ttbv[3,j,tt.count[j]] = bsky2
-            for itbv=1:3, k=1:7, p=1:s.n
-                tt.dtbvdq0[itbv,j,tt.count[j],k,p] = tt.dtbvdq[itbv,k,p]
-            end
-            return
-        end
-        tt.ttbv[2,j,tt.count[j]] = calc_vsky(s.v,i,j)
-        tt.ttbv[3,j,tt.count[j]] = calc_bsky2(s.x,i,j)
-        return
-    end
-
-    tt.tt[j,tt.count[j]] = s.t[1] + dt0
-    if grad
-        # Compute derivative of transit time
-        dtbvdq!(i,j,s.x,s.v,s.jac_step,s.dqdt,tt.dtdq)
-        for k=1:7, p=1:s.n
-            tt.dtdq0[j,tt.count[j],k,p] = tt.dtdq[1,k,p]
-        end
-    end
+    save_transit!(i,j,s,tt,dt0;grad=grad)
     return
 end
 
@@ -136,6 +110,67 @@ function calc_dtdelements!(s::State{T},ttbv::TransitParameters{T}) where T <: Ab
         end
     end
 end
+
+function calc_dtdelements!(s::State{T},tt::TransitTimingDelayed{T}) where T <: AbstractFloat
+    for  ittd=1:2, i=1:s.n, j = 1:tt.count[i]
+        if j <= tt.ntt
+            # Now, multiply by the initial Jacobian to convert time derivatives to orbital elements:
+            for k=1:s.n, l=1:7
+                tt.dttddelements[ittd,i,j,l,k] = zero(T)
+                for p=1:s.n, q=1:7
+                    tt.dttddelements[ittd,i,j,l,k] += tt.dttddq0[ittd,i,j,q,p]*s.jac_init[(p-1)*7+q,(k-1)*7+l]
+                end
+                tt.dttddelements[ittd,i,j,:,:] = tt.jac_delay * tt.dttddelements[ittd,i,j,:,:]
+            end
+        end
+    end
+end
+
+
+function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitOutput{T},dt0::T;grad::Bool=true) #Generic function
+    tt.tt[j,tt.count[j]] = s.t[1] + dt0
+    if grad
+        # Compute derivative of transit time
+        dtbvdq!(i,j,s.x,s.v,s.jac_step,s.dqdt,tt.dtdq)
+        for k=1:7, p=1:s.n
+            tt.dtdq0[j,tt.count[j],k,p] = tt.dtdq[1,k,p]
+        end
+    end
+end
+
+
+function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitParameters{T},dt0::T;grad::Bool=true)
+        # Compute the impact parameter and sky velocity, save to tt along with transit time.
+        tt.ttbv[1,j,tt.count[j]] = s.t[1] + dt0
+
+        if grad
+            # Compute derivative of transit time, impact parameter, and sky velocity.
+            vsky,bsky2 = dtbvdq!(i,j,s.x,s.v,s.jac_step,s.dqdt,tt.dtbvdq)
+            tt.ttbv[2,j,tt.count[j]] = vsky
+            tt.ttbv[3,j,tt.count[j]] = bsky2
+            for itbv=1:3, k=1:7, p=1:s.n
+                tt.dtbvdq0[itbv,j,tt.count[j],k,p] = tt.dtbvdq[itbv,k,p]
+            end
+            return
+        end
+        tt.ttbv[2,j,tt.count[j]] = calc_vsky(s.v,i,j)
+        tt.ttbv[3,j,tt.count[j]] = calc_bsky2(s.x,i,j)
+        return
+end
+
+function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitTimingDelayed{T},dt0::T;grad::Bool=true)
+    
+    delay = s.x[3,j]/CLIGHT # NbodyGradient initializes the system in the center-of mass frame.
+    tt.ttd[1,j,tt.count[j]] = s.t[1] + dt0 
+    tt.ttd[2,j,tt.count[j]] = s.t[1] + dt0 + delay
+    if grad
+        # Compute derivative of transit time
+        dtbvdq!(i,j,s.x,s.v,s.jac_step,s.dqdt,tt.dttddq)
+
+    end
+
+end
+
 
 """Used in computing transit time inside `findtransit3`."""
 function g!(i::Int64,j::Int64,x::Array{T,2},v::Array{T,2}) where {T <: Real}
@@ -170,6 +205,7 @@ function dtbvdq!(i::Int64,j::Int64,x::Matrix{T},v::Matrix{T},jac_step::Matrix{T}
                           (jac_step[indj+3,indp+k]-jac_step[indi+3,indp+k])*(x[1,j]-x[1,i])+(jac_step[indj+4,indp+k]-jac_step[indi+4,indp+k])*(x[2,j]-x[2,i]))/gdot
         end
     end
+
     ntbv = size(dtbvdq)[1]
     if ntbv == 3
         # Compute the impact parameter and sky velocity:
@@ -190,5 +226,19 @@ function dtbvdq!(i::Int64,j::Int64,x::Matrix{T},v::Matrix{T},jac_step::Matrix{T}
         end
         return vsky,bsky2
     end
+
+    if ntbv == 2 #Time delay but this should be refactored
+        dldΔt = dqdt[(j-1)*7+3]/CLIGHT
+        for p=1:n
+            indp = (p-1)*7
+            for k=1:7
+                # Note that jac_step[(j-1)*7+l,(j-1)*7+k] is the derivative of the lth coordinate
+                # of planet j with respect to the kth coordinate of planet p.
+                dtbvdq[2,k,p] += dtbvdq[1,k,p] #
+                dtbvdq[2,k,p] += jac_step[(j-1)*7+3,indp+k]/CLIGHT+dldΔt*dtbvdq[1,k,p]
+            end
+        end
+    end
+
     return
 end

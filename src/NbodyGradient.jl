@@ -16,6 +16,8 @@ const GNEWT = 39.4845/(YEAR*YEAR)
 const third = 1.0/3.0
 const alpha0 = 0.0
 
+const CLIGHT = 173.1446326742403 # c in AU/day
+
 # Types
 export Elements, ElementsIC, CartesianIC, InitialConditions
 export State, dState
