@@ -135,7 +135,7 @@ Transit times and derivatives including simple light travel delay.
 - `dttddelements::Array{T,5}` : Derivatives with respect to the initial orbital elements and masses.
 """
 struct TransitTimingDelayed{T<:AbstractFloat} <: TransitOutput{T}
-    tttd::Array{3,T}
+    tttd::Array{T,3}
     dttddq0::Array{T,5}
     dttddelements::Array{T,5}
 
@@ -144,8 +144,8 @@ struct TransitTimingDelayed{T<:AbstractFloat} <: TransitOutput{T}
     ntt::Int64
     ti::Int64
     occs::Vector{Int64}
-    dtdq::Array{T,3}
-    jacinitdelay::Matrix{T}
+    dttddq::Array{T,3}
+    # jacinitdelay::Matrix{T}
     gsave::Vector{T}
     s_prior::State{T}
     s_transit::State{T}
@@ -172,14 +172,14 @@ function TransitTimingDelayed(tmax::T,ic::ElementsIC{T},ti::Int64=1) where T<:Ab
     dttddelements = zeros(T,2,n,ntt,7,n)
     count = zeros(Int64,n)
     occs = setdiff(collect(1:n),ti)
-    dtdq = zeros(T,1,7,n)
+    dttddq = zeros(T,2,7,n)
     gsave = zeros(T,n)
     s_prior = State(ic)
     s_transit = State(ic)
 
 # stuff about jac delay here
 
-    return TransitTimingDelayed(tttd,dttddq0,dttddelements,count,ntt,ti,occs,dtdq,gsave,s_prior,s_transit)
+    return TransitTimingDelayed(tttd,dttddq0,dttddelements,count,ntt,ti,occs,dttddq,gsave,s_prior,s_transit)
 end
 
 

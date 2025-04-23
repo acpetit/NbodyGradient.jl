@@ -24,7 +24,7 @@ export State, dState
 export Integrator
 export Jacobian, dTime
 export CartesianOutput, ElementsOutput
-export TransitTiming, TransitParameters, TransitSnapshot
+export TransitTiming, TransitParameters, TransitSnapshot, TransitTimingDelayed
 
 # Integrator methods
 export ahl21!, dh17!

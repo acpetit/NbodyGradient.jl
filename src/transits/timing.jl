@@ -120,7 +120,7 @@ function calc_dtdelements!(s::State{T},tt::TransitTimingDelayed{T}) where T <: A
                 for p=1:s.n, q=1:7
                     tt.dttddelements[ittd,i,j,l,k] += tt.dttddq0[ittd,i,j,q,p]*s.jac_init[(p-1)*7+q,(k-1)*7+l]
                 end
-                tt.dttddelements[ittd,i,j,:,:] = tt.jac_delay * tt.dttddelements[ittd,i,j,:,:]
+                # tt.dttddelements[ittd,i,j,:,:] = tt.jac_delay * tt.dttddelements[ittd,i,j,:,:] To add back once decided on using observed t0
             end
         end
     end
@@ -161,12 +161,14 @@ end
 function save_transit!(i::Int64,j::Int64,s::State{T},tt::TransitTimingDelayed{T},dt0::T;grad::Bool=true) where T <: AbstractFloat
     
     delay = s.x[3,j]/CLIGHT # NbodyGradient initializes the system in the center-of mass frame.
-    tt.ttd[1,j,tt.count[j]] = s.t[1] + dt0 
-    tt.ttd[2,j,tt.count[j]] = s.t[1] + dt0 + delay
+    tt.tttd[1,j,tt.count[j]] = s.t[1] + dt0 
+    tt.tttd[2,j,tt.count[j]] = s.t[1] + dt0 + delay
     if grad
         # Compute derivative of transit time
         dtbvdq!(i,j,s.x,s.v,s.jac_step,s.dqdt,tt.dttddq)
-
+        for itbv=1:2, k=1:7, p=1:s.n
+            tt.dttddq0[itbv,j,tt.count[j],k,p] = tt.dttddq[itbv,k,p]
+        end
     end
 
 end
