@@ -37,6 +37,7 @@ include("integrator/Integrator.jl")
 include("utils.jl")
 include("outputs/Outputs.jl")
 include("transits/Transits.jl")
+include("transits/RV.jl")
 
 # To be cleaned up
 # include("integrator/ah18/ah18_old.jl")
