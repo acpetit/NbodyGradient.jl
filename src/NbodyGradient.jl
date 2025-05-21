@@ -23,6 +23,7 @@ export Integrator
 export Jacobian, dTime
 export CartesianOutput, ElementsOutput
 export TransitTiming, TransitParameters, TransitSnapshot
+export RadialVelocities
 
 # Integrator methods
 export ahl21!, dh17!

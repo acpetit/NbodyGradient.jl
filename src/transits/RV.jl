@@ -1,8 +1,12 @@
+"""
+    Abstract type for RV-like data. The first field should be the `epochs::Vector{T}` at which the measurement is made.
+"""
 abstract type RVOutput{T} <: AbstractOutput{T} end
 
 
 struct RadialVelocities{T<:AbstractFloat} <: RVOutput{T}
-    rv::Matrix{T}
+    epochs::Vector{T}
+    rv::Vector{T}
     drvdq0::Array{T,3}
     drvdelements::Array{T,3}
 
@@ -10,8 +14,9 @@ struct RadialVelocities{T<:AbstractFloat} <: RVOutput{T}
     nrv::Int64
     ti::Int64
     drvdq::Array{T,3}
-    lasttime::T
-    lastepoch::Int64
+    lasttime::Vector{T} #Maybe not useful too.
+    t0::T #Not super nice but feels necessary to reset in zero_out!
+    lastepoch::Vector{Int64}
     s_prior::State{T}
     s_rv::State{T}
 end
@@ -20,27 +25,38 @@ end
 """
     RadialVelocities(epochs, ic; ti)
 
-Constructor for [`TransitTiming`](@ref) type.
+Constructor for [`RadialVelocities`](@ref) type.
 
 # Arguments
-- `tmax::T` : Expected total elapsed integration time. (Allocates arrays accordingly)
+- `epochs::Vector{T}` : Epochs at which the RV measurements are needed
 - `ic::ElementsIC{T}` : Initial conditions for the system
 
 ## Optional
-- `ti::Int64=1` : Index of the body with respect to which transits are measured. (Default is the central body)
+- `ti::Int64=1` : Index of the body with respect to which the RV are measured. (Default is the central body)
 """
-function RadialVelocities(epochs::T,ic::ElementsIC{T},ti::Int64=1) where T<:AbstractFloat
+function RadialVelocities(epochs::Vector{T},ic::ElementsIC{T},ti::Int64=1) where T<:AbstractFloat
     n = ic.nbody
     nrv = length(epochs)
-    rv = zeros(T,n,nrv)
+    rv = zeros(T,nrv)
     drvdq0 = zeros(T,nrv,7,n)
     drvdelements = zeros(T,nrv,7,n)
     drvdq = zeros(T,1,7,n)
-    lasttime = ic.t0
-    lastepoch = 0
+    lasttime = [ic.t0]
+    t0 = ic.t0
+    lastepoch = [1]
     s_prior = State(ic)
     s_rv = State(ic)
-    return RadialVelocities(rv,drvdq0,drvdelements,nrv,ti,drvdq,lasttime,lastepoch,s_prior,s_rv)
+    return RadialVelocities(epochs,rv,drvdq0,drvdelements,nrv,ti,drvdq,lasttime,t0,lastepoch,s_prior,s_rv)
+end
+
+function zero_out!(rv::RVOutput{T}) where T
+    for i in 2:length(fieldnames(typeof(rv))) #the first field of RVOutput{T} is always the epochs that shouldn't be reinitialized.
+        if typeof(getfield(rv,i)) <: Array{T}
+            getfield(rv,i) .= zero(T)
+        end
+    end
+    rv.lastepoch[1] = 1
+    rv.lasttime[1] = rv.t0 
 end
 
 """
@@ -74,7 +90,7 @@ function (intr::Integrator)(s::State{T}, tt::TransitOutput{T},rv::RVOutput{T}, d
 
         # Check if a transit occured; record time.
         detect_transits!(s,d,tt,intr,grad=grad)
-        detect_rvepochs!(s,d,rv,intr,h,grad=grad)
+        detect_rvepochs!(s,d,rv,intr,grad=grad) #Maybe h is necessary in general if the function is called outside of step loop and to get the time direction?
     end
     # Calculate derivatives
     if grad
